@@ -7,37 +7,130 @@ import (
 	"time"
 )
 
-var grammar map[string]bool = map[string]bool{
-	"function": true,
-	"if": true,
-	"this": true,
-	"undefined": true,
+var keywords map[string]bool = map[string]bool{
+	"break":      true,
+	"do":         true,
+	"instanceof": true,
+	"typeof":     true,
+	"case":       true,
+	"else":       true,
+	"new":        true,
+	"var":        true,
+	"catch":      true,
+	"finally":    true,
+	"return":     true,
+	"void":       true,
+	"continue":   true,
+	"for":        true,
+	"switch":     true,
+	"while":      true,
+	"debugger":   true,
+	"function":   true,
+	"this":       true,
+	"with":       true,
+	"default":    true,
+	"if":         true,
+	"throw":      true,
+	"delete":     true,
+	"in":         true,
+	"try":        true,
 }
 
-var operators map[string]bool = map[string]bool{
-	"==": true,
-	"===": true,
-	"!=": true,
-	"!==": true,
-	"<": true,
-	">": true,
-	"<=": true,
-	">=": true,
+var punctuators map[string]func(rune)(string, bool) = map[string]func(rune)(string, bool){
+	"{":    SingleRunePunctuator,
+	"}":    SingleRunePunctuator,
+	"(":    SingleRunePunctuator,
+	")":    SingleRunePunctuator,
+	"[":    SingleRunePunctuator,
+	"]":    SingleRunePunctuator,
+	".":    SingleRunePunctuator,
+	";":    SingleRunePunctuator,
+	",":    SingleRunePunctuator,
+	"<":    SingleRunePunctuator,
+	">":    SingleRunePunctuator,
+	"<=":   true,
+	">=":   true,
+	"==":   true,
+	"!=":   true,
+	"===":  true,
+	"!==":  true,
+	"+":    true,
+	"-":    true,
+	"*":    true,
+	"%":    true,
+	"++":   true,
+	"--":   true,
+	"<<":   true,
+	">>":   true,
+	">>>":  true,
+	"&":    true,
+	"|":    true,
+	"^":    true,
+	"!":    true,
+	"~":    true,
+	"&&":   true,
+	"||":   true,
+	"?":    true,
+	":":    true,
+	"=":    true,
+	"+=":   true,
+	"-=":   true,
+	"*=":   true,
+	"%=":   true,
+	"<<=":  true,
+	">>=":  true,
+	">>>=": true,
+	"&=":   true,
+	"|=":   true,
+	"^=":   true,
 }
 
-var separators map[rune]bool = map[rune]bool{
-	' ': true,
-	'=': true,
-	'[': true,
-	']': true,
-	'(': true,
-	')': true,
+var whitespace map[rune]bool = map[rune]bool{
+	'\u0009': true,
+	'\u000B': true,
+	'\u000C': true,
+	'\u0020': true,
+	'\u00A0': true,
+	'\u1680': true,
+	'\u2000': true,
+	'\u2001': true,
+	'\u2002': true,
+	'\u2003': true,
+	'\u2004': true,
+	'\u2005': true,
+	'\u2006': true,
+	'\u2007': true,
+	'\u2008': true,
+	'\u2009': true,
+	'\u200A': true,
+	'\u202F': true,
+	'\u205F': true,
+	'\u3000': true,
+	'\uFEFF': true,
+}
+
+var lineterminators map[rune]bool = map[rune]bool{
+	'\u000A': true,
+	'\u000D': true,
+	'\u2028': true,
+	'\u2029': true,
+}
+
+var stringliterals map[rune]bool = map[rune]bool{
 	'\'': true,
 	'"': true,
-	'/': true,
-	'.': true,
-	'{': true,
-	'}': true,
+}
+
+func SingleRunePunctuator(r rune) (string, bool) {
+	return string(r), true
+}
+
+func MultiRunePunctuator(complete string) func(r rune)(string, bool) {
+	handler := func(r rune)(string, bool) {
+		return "", false
+	}
+
+	return handler
 }
 
 func main() {
@@ -58,22 +151,49 @@ func main() {
 	
 	tokens := make([][]rune, 0, len(contents))
 	
-	token := make([]rune, 0, 10)
+	var token []rune
+
+	var cminus1 rune
+	var inString bool
 
 	start := time.Now()
 	for _, c := range contents {
+		if stringliterals[c] && !inString {
+			cminus1 = 0
+			inString = true
+			continue
+		}
+
+		if inString {
+			if stringliterals[c] {
+				inString = false
+				tokens = append(tokens, token)
+				token = make([]rune, 0, 10)
+			} else {
+				token = append(token, c)
+			}
+			continue
+		}
+
+		if cminus1 == 0 {
+			if !whitespace[c] && !lineterminators[c] && punctuators[string(c)] {
+				cminus1 = c
+			}
+			continue
+		}
+
+		if whitespace[c] || lineterminators[c] || punctuators[string(c)] {
+			if len(token) > 0 {
+				tokens = append(tokens, token)
+			}
+
+			token = make([]rune, 0, 10)
+			cminus1 = 0
+			continue
+		}
+
 		token = append(token, c)
-
-		if grammar[string(token)] {
-			tokens = append(tokens, token)
-			token = make([]rune, 0, 10)
-			continue
-		}
-
-		if separators[c] {
-			token = make([]rune, 0, 10)
-			continue
-		}
+		cminus1 = c
 	}
 	fmt.Println(time.Now().Sub(start))
 
